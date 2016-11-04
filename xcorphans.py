@@ -76,10 +76,38 @@ class XCOrphans(object):
     @lazyprop
     def all_filesystem_files(self):
         # result = [y for x in os.walk(PATH) for y in glob(os.path.join(x[0], '*.txt'))]
-        root = "/Users/alex/code/fanduel/core-ios/"
+        # root = "/Users/alex/code/fanduel/core-ios/"
+        root = "/Volumes/Fast/code/fanduel/core-ios/"
         result = [os.path.relpath(os.path.join(dp, f), root) for dp, dn, filenames in os.walk(root) for f in filenames if os.path.splitext(f)[1][1:] in self.source_extensions]
-
         return result
+
+    def path(self, fileRef):
+        matches = [f for f in self.project_document.objects.items() if f[0] == fileRef]
+        if len(matches) == 0:
+            return None
+        path = []
+        match = matches[0]
+        sourceTree = match[1]['sourceTree']
+        ref = match[0]
+        path.append(match[1]['path'])
+        while sourceTree == "<group>":
+            matches = [f for f in self.project_document.objects.items() if f[1].get('isa') == 'PBXGroup' and ref in f[1].get('children')]
+            if len(matches) == 0:
+                return None
+            match = matches[0]
+            sourceTree = match[1]['sourceTree']
+            if sourceTree == 'SOURCE_ROOT':
+                path.append(match[1]['path'])
+                break
+            ref = match[0]
+            pathElement = match[1].get('path')
+            if pathElement != None:
+                path.append(pathElement)
+            else:
+                break
+
+        path.reverse()
+        return os.path.join(*path)
 
     @lazyprop
     def all_file_refs(self):
@@ -128,17 +156,23 @@ class XCOrphans(object):
 
 
 @click.command()
-@click.option('--pbxproj', help='Location of Xcode project file.', required=True)
-def xcorphans(pbxproj):
+@click.option('--pbxproj', help='Location of Xcode project file.', required=False)
+@click.option('--projroot', help='Location of project root folder.', required=False)
+def xcorphans(pbxproj, projroot):
     """Orphaned Files analyses the Xcode project file to find files which are located in the project folder but
     not used by the project, as well as source files which are referenced in the project but not compiled by any
     of the build targets."""
 
+    # if pbxproj
 
     orphAnalyser = XCOrphans(pbxproj)
-    orphAnalyser.analyse()
-    # orphAnalyser.loadProjectFile()
+    # orphAnalyser.analyse()
+    orphAnalyser.loadProjectFile()
+    # print projroot
     # print orphAnalyser.all_filesystem_files
+    fileRefs = orphAnalyser.all_file_refs
+    for fileRef in fileRefs:
+        print orphAnalyser.path(fileRef=fileRef)
 
     # project_document = XcodeProject.Load(pbxproj)
     # if project_document is None:
