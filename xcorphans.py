@@ -23,9 +23,11 @@ class XCOrphans(object):
 
     def analyse(self):
         self.loadProjectFile()
-        files = self.not_build_source_files
-        for file in files:
-            print("**** source file referenced but never built: %s" % file['path'])
+        for pbx01File in self.not_build_source_files:
+            print("PBX01 source file referenced in project but not in any targets: %s" % pbx01File['path'])
+        for pbx02File in self.build_not_project_source_files:
+            print "PBX02 source file referenced in target but not in project: ref# %s" % (pbx02File)
+
     # TODO: build full relative path to file for comparison with source files from filesystem
     # TODO: need to check headers too for filesystem
     # TODO: what about folder references?
@@ -47,6 +49,15 @@ class XCOrphans(object):
             if extension in self.source_extensions:
                 not_build_source_files.append(file)
         return not_build_source_files
+
+    @lazyprop
+    def build_not_project_source_files(self):
+        file_refs = []
+        for build_file_ref in self.build_file_refs:
+            matches = [f for f in self.project_document.objects.items() if f[0] == build_file_ref]
+            if len(matches) == 0:
+                file_refs.append(build_file_ref)
+        return file_refs
 
     @lazyprop
     def not_build_files(self):
@@ -78,9 +89,11 @@ class XCOrphans(object):
     def build_file_ref_refs(self):
         build_file_ref_refs = []
         for build_file_ref in self.build_file_refs:
-            build_file = [f for f in self.project_document.objects.items() if f[0] == build_file_ref][0][1]
-            file_ref_ref = build_file.get('fileRef')
-            build_file_ref_refs.append(file_ref_ref)
+            matches = [f for f in self.project_document.objects.items() if f[0] == build_file_ref]
+            if len(matches) > 0:
+                build_file = matches[0][1]
+                file_ref_ref = build_file.get('fileRef')
+                build_file_ref_refs.append(file_ref_ref)
         return build_file_ref_refs
 
     @lazyprop
